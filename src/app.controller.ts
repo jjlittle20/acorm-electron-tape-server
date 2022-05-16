@@ -1,7 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res } from '@nestjs/common';
 import { AppService } from './app.service';
 
-@Controller()
+@Controller('api')
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
@@ -12,5 +12,11 @@ export class AppController {
   @Get('/acorn')
   getAcorn(): string {
     return this.appService.getAcorn();
+  }
+
+  @Post('/acorn/getFile')
+  start(@Req() req: any, @Res() res: any): any {
+    console.log(req.body);
+    return this.appService.sendFile(req, res);
   }
 }

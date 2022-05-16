@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-
+import * as AdmZip from 'adm-zip';
+import axios from 'axios';
+import { Readable } from 'stream';
 @Injectable()
 export class AppService {
   getHello(): string {
@@ -185,6 +187,62 @@ export class AppService {
       // { parent: 'magtapes/', files: [] },
       // { parent: 'util/', files: [] },
     ];
+
     return arr;
+  }
+  sendFile = (req, res) => {
+    res.status(200);
+    const url = `http://www.stairwaytohell.com/electron/uefarchive/${req.body.parent}${req.body.file}.zip`;
+
+    axios({
+      url: url,
+      method: 'GET',
+      responseType: 'arraybuffer',
+    })
+      .then((response) => {
+        return this.handleZip({
+          file: response.data,
+          name: `${req.body.file}.zip`,
+        });
+      })
+      .then((data) => {
+        //  res.send({ file: data, name: req.body.file }
+        const readable = new Readable();
+        readable._read = () => {
+          null;
+        }; // _read is required but you can noop it
+        readable.push(data);
+        readable.push(null);
+
+        readable.pipe(res);
+      });
+  };
+
+  handleZip(input) {
+    const filedata = input.file;
+    const filename = input.name;
+    let unzippedFile;
+
+    if (filename.split('.').pop().toLowerCase() == 'zip') {
+      try {
+        const zip = new AdmZip(filedata);
+
+        const zipEntries = zip.getEntries();
+
+        zipEntries.forEach(function (zipEntry) {
+          // if (zipEntry.entryName.split('.').pop().toLowerCase() == 'txt') {
+          //   console.log(zipEntry.toString('utf8'));
+          //   console.log(zipEntry.name);
+          // }
+          if (zipEntry.entryName.split('.').pop().toLowerCase() == 'uef') {
+            unzippedFile = zipEntry.getData();
+          }
+        });
+      } catch (e) {
+        console.error('trying to unzip' + filename, e);
+      }
+    }
+
+    return unzippedFile;
   }
 }
