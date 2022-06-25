@@ -256,7 +256,7 @@ export class AppService {
   };
 
   handleGunzip = (file) => {
-    Zlib.decompress(file, (err, buffer) => {
+    Zlib.gunzip(file, (err, buffer) => {
       console.log('buffer----->', buffer);
 
       // Calling gunzip method

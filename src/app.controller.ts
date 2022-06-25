@@ -16,7 +16,7 @@ export class AppController {
 
   @Post('/acorn/getFile')
   start(@Req() req: any, @Res() res: any): any {
-    console.log(req.body);
+    console.log('reqbody------------>', req.body);
     return this.appService.sendFile(req, res);
   }
 }
