@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import * as AdmZip from 'adm-zip';
 import axios from 'axios';
-import { Readable } from 'stream';
+import * as Zlib from 'zlib';
+import uef2wave from './functions/uefToWave';
+
+const LOW = 1200;
+const PHASE = 180;
+const CARRIER = 2;
+const STOPBIT = 4;
+const HIGH = LOW * 2;
+const SAMPLE_RATE = 48000;
+const BAUD = Math.floor((LOW + HIGH / 2) / 2);
 @Injectable()
 export class AppService {
   getHello(): string {
@@ -190,35 +199,36 @@ export class AppService {
 
     return arr;
   }
-  sendFile = (req, res) => {
+  sendFile = async (req, res) => {
     res.status(200);
     const url = `http://www.stairwaytohell.com/electron/uefarchive/${req.body.parent}${req.body.file}.zip`;
 
-    axios({
+    const response = await axios({
       url: url,
       method: 'GET',
       responseType: 'arraybuffer',
-    })
-      .then((response) => {
-        return this.handleZip({
-          file: response.data,
-          name: `${req.body.file}.zip`,
-        });
-      })
-      .then((data) => {
-        //  res.send({ file: data, name: req.body.file }
-        const readable = new Readable();
-        readable._read = () => {
-          null;
-        }; // _read is required but you can noop it
-        readable.push(data);
-        readable.push(null);
+      headers: {
+        'content-type': 'application/zip',
+      },
+    });
 
-        readable.pipe(res);
-      });
+    await this.handleZip({
+      file: response.data,
+      name: `${req.body.file}.zip`,
+    });
+
+    // const extractedFile = { file: decompressedData, name: req.body.file };
+    // console.log(extractedFile);
+    // const uefData = extractedFile.file;
+
+    // fs.writeFile('bb.wav', Buffer.from(converted.wav), function (err) {
+    //   console.error(err);
+    // });
+    // console.log(Buffer.from(converted.wav));
   };
 
-  handleZip(input) {
+  handleZip = async (input) => {
+    console.log('input--------->', input);
     const filedata = input.file;
     const filename = input.name;
     let unzippedFile;
@@ -230,10 +240,6 @@ export class AppService {
         const zipEntries = zip.getEntries();
 
         zipEntries.forEach(function (zipEntry) {
-          // if (zipEntry.entryName.split('.').pop().toLowerCase() == 'txt') {
-          //   console.log(zipEntry.toString('utf8'));
-          //   console.log(zipEntry.name);
-          // }
           if (zipEntry.entryName.split('.').pop().toLowerCase() == 'uef') {
             unzippedFile = zipEntry.getData();
           }
@@ -242,7 +248,37 @@ export class AppService {
         console.error('trying to unzip' + filename, e);
       }
     }
+    console.log('unzippped------------>', unzippedFile);
 
-    return unzippedFile;
-  }
+    await this.handleGunzip(unzippedFile);
+
+    // return decompressed;
+  };
+
+  handleGunzip = (file) => {
+    Zlib.decompress(file, (err, buffer) => {
+      console.log('buffer----->', buffer);
+
+      // Calling gunzip method
+      // console.log(buffer);
+      for (let i = 0; i < 2000; i++) {
+        console.log(String.fromCharCode(buffer[i]));
+      }
+
+      const converted = uef2wave(
+        buffer,
+        BAUD,
+        SAMPLE_RATE,
+        STOPBIT,
+        PHASE,
+        CARRIER,
+        HIGH,
+      );
+      console.log('WAV----->', converted);
+      // fs.writeFile('bb.wav', Buffer.from(converted.wav), function (err) {
+      //   console.error(err);
+      // });
+      // console.log(Buffer.from(converted.wav));
+    });
+  };
 }
